@@ -1,7 +1,7 @@
-import { Space, Typography, Card, Input, Select, Button, Tag, Table, Modal, Form } from "antd";
+import { Space, Typography, Card, Input, Select, Button, Tag, Table, Modal, Form, InputNumber, message, Popconfirm } from "antd";
 import { useState } from "react";
 
-const products = [
+const initialProducts = [
   { id: 1, name: "Wireless Mouse", category: "Accessories", price: 799, stock: 12 },
   { id: 2, name: "Keyboard", category: "Accessories", price: 1599, stock: 4 },
   { id: 3, name: "Monitor", category: "Electronics", price: 12499, stock: 0 },
@@ -56,6 +56,39 @@ function App() {
   const [price, setPrice] = useState(false);
   const [isModelOpen, setIsModelOpen] = useState(false);
   const [form] = Form.useForm();
+  const [products, setProducts] = useState(initialProducts);
+  const [editProduct, setEditProduct] = useState(null);
+
+  const tableColumns = [
+    ...columns,
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, product) => (
+        <Space>
+          <Button
+            type="link"
+            onClick={() => handleEditProduct(product)}
+          >
+            Edit
+          </Button>
+
+          <Popconfirm
+            title="Delete this product?"
+            description={`Are you sure you want to delete ${product.name}?`}
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDeleteProduct(product.id)}
+          >
+            <Button type="link" danger>
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   const filteredStock = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(search.toLowerCase());
@@ -68,6 +101,55 @@ function App() {
   });
 
   const totalStock = filteredStock.reduce((total, product) => total + product.stock, 0);
+
+  const handleSaveProduct = (values) => {
+    console.log("Form submitted:", values);
+
+    if (editProduct) {
+      setProducts((previousProducts) =>
+        previousProducts.map((product) =>
+          product.id == editProduct.id ? { ...product, ...values } : product
+        ))
+    }
+    else {
+      const newProduct = {
+        id: Date.now(),
+        ...values,
+      };
+
+      console.log("New product:", newProduct);
+
+      setProducts((previousProducts) => [
+        newProduct,
+        ...previousProducts
+      ]);
+      message.success("Product added successfully");
+    }
+    setIsModelOpen(false);
+    form.resetFields();
+    setEditProduct(null);
+  }
+
+  const openAddModel = () => {
+    setEditProduct(null);
+    form.resetFields();
+    setIsModelOpen(true);
+  };
+
+  const handleEditProduct = (product) => {
+    setEditProduct(product);
+    form.setFieldsValue(product);
+    setIsModelOpen(true);
+  };
+
+  const handleDeleteProduct = (productId) => {
+    setProducts((previousProduct) => 
+      previousProduct.filter(
+        (product) => product.id !== productId
+      )
+    )
+    message.success("Product Deleted Successfully");
+  };
 
   return (
     <div style={{ maxWidth: 1100, margin: "32px auto", padding: "20px" }}>
@@ -92,14 +174,14 @@ function App() {
               {lowStock ? "Show All Products" : "Low Stock Only"}</Button>
 
             <Button type={price ? "primary" : "default"} onClick={() => setPrice((previous) => !previous)}>{price ? "Show All prices" : "Price Filter(Less than 3000)"}</Button>
-            <Button type="primary" onClick={() => setIsModelOpen(true)}>Add Product</Button>
+            <Button type="primary" onClick={openAddModel}>Add Product</Button>
           </Space>
         </Card>
-        <Modal title="Add Product" open={isModelOpen} onCancel={() => {
+        <Modal title={editProduct ? "Edit Product" : "Add Product"} open={isModelOpen} onCancel={() => {
           setIsModelOpen(false);
           form.resetFields();
-        }} okText="Add Product" onOk={() => form.submit()}>
-          <Form form={form} layout="vertical">
+        }} okText={editProduct ? "Save Changes" : "Add Product"} onOk={() => form.submit()} >
+          <Form form={form} layout="vertical" onFinish={handleSaveProduct} initialValues={{ stock: 0 }}>
             <Form.Item name="name" label="Product Name" rules={[
               { required: true, message: "Enter the product name" },
               { min: 2, message: "Name must contain at least 2 characters" },
@@ -107,8 +189,29 @@ function App() {
               <Input placeholder="e.g. Wireless Mouse" maxLength={100} />
             </Form.Item>
 
-            <Form.Item name="category" label="category" rules={[{required: true}]}>
+            <Form.Item name="category" label="category" rules={[{
+              required: true, message: "Select a category"
+            }]}>
+              < Select placeholder="Select a category" options={[
+                { value: "Accessories", label: "Accessories" },
+                { value: "Electronics", label: "Electronics" },
+              ]}></Select>
+            </Form.Item>
 
+            <Form.Item
+              name="price"
+              label="Price (₹)"
+              rules={[{ required: true, message: "Enter the price" }]}
+            >
+              <InputNumber min={0} precision={2} style={{ width: "100%" }} />
+            </Form.Item>
+
+            <Form.Item
+              name="stock"
+              label="Stock Quantity"
+              rules={[{ required: true, message: "Enter the stock quantity" }]}
+            >
+              <InputNumber min={0} precision={0} style={{ width: "100%" }} />
             </Form.Item>
           </Form>
         </Modal>
@@ -118,7 +221,7 @@ function App() {
         </Space>
         <Table
           rowKey="id"
-          columns={columns}
+          columns={tableColumns}
           dataSource={filteredStock}
           pagination={{ pageSize: 5 }}
           locale={{
@@ -126,7 +229,7 @@ function App() {
           }}
         />
       </Space>
-    </div>
+    </div >
   )
 }
 
